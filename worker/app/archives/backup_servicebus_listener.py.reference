@@ -1,0 +1,28 @@
+from fastapi import FastAPI
+from azure.servicebus import ServiceBusMessage
+from azure.servicebus.aio import ServiceBusClient
+from shared.database import SessionLocal
+import asyncio
+from .backup_processor import process_recording_message
+import os
+
+
+
+SERVICE_BUS_CONNECTION_STR = ""
+TOPIC_NAME = 
+SUBSCRIPTION_NAME = ""
+
+
+async def listen_to_service_bus():
+    servicebus_client = ServiceBusClient.from_connection_string(conn_str=SERVICE_BUS_CONNECTION_STR)
+    await servicebus_client.__aenter__()  # Manually enter async context
+    try:
+        receiver = servicebus_client.get_subscription_receiver(topic_name=TOPIC_NAME, subscription_name=SUBSCRIPTION_NAME)
+        async with receiver:
+            while True:
+                messages = await receiver.receive_messages(max_message_count=10, max_wait_time=5)
+                for message in messages:
+                    await process_recording_message(message, SessionLocal)
+                    await receiver.complete_message(message)
+    finally:
+        await servicebus_client.__aexit__(None, None, None)
